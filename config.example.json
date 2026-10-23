@@ -1,0 +1,7 @@
+{
+  "locale": "en",
+  "theme": "dark",
+  "downloadConcurrency": 6,
+  "newsEnabled": false,
+  "telemetryEnabled": false
+}

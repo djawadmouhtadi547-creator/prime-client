@@ -1,0 +1,96 @@
+{
+  "name": "prime-client",
+  "productName": "PRIME CLIENT",
+  "version": "1.0.0",
+  "description": "PRIME CLIENT \u2014 Minecraft Java launcher and profile manager by djawad1",
+  "author": "djawad1",
+  "license": "MIT",
+  "private": true,
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\" \"npm:dev:launch\"",
+    "dev:renderer": "vite --host 127.0.0.1",
+    "dev:electron": "tsc -p tsconfig.electron.json --watch",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "test": "vitest run",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "npm run typecheck && npm test && npm run build:renderer && npm run build:electron",
+    "dist:win": "npm run build && electron-builder --win nsis portable",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip",
+    "dev:launch": "node scripts/dev-launcher.mjs"
+  },
+  "dependencies": {
+    "extract-zip": "2.0.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "concurrently": "9.1.0",
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8",
+    "typescript": "5.7.2",
+    "vite": "5.4.14",
+    "vitest": "2.1.8"
+  },
+  "build": {
+    "appId": "dev.djawad1.primeclient",
+    "productName": "PRIME CLIENT",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "PRIME-CLIENT-${version}-${arch}.${ext}",
+      "icon": "assets/prime.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "PRIME-CLIENT-${version}-portable-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Game",
+      "artifactName": "PRIME-CLIENT-${version}-${arch}.${ext}",
+      "icon": "assets/prime-icon.png"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.games",
+      "artifactName": "PRIME-CLIENT-${version}-${arch}.${ext}",
+      "icon": "assets/prime.icns"
+    }
+  }
+}

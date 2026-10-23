@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">PRIME CLIENT placeholder mark</title>
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#9af5ce"/><stop offset="1" stop-color="#35c68a"/></linearGradient></defs>
+  <rect width="256" height="256" rx="58" fill="#101718"/>
+  <path d="M55 202V54h80c42 0 66 22 66 59s-24 60-66 60H99v29H55zm44-68h34c15 0 24-7 24-21s-9-20-24-20H99v41z" fill="url(#g)"/>
+  <path d="M176 179l22 23 28-35" fill="none" stroke="#eafff5" stroke-linecap="round" stroke-linejoin="round" stroke-width="10"/>
+</svg>
