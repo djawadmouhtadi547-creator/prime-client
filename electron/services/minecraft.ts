@@ -106,7 +106,7 @@ function rulesAllow(rules?: Rule[]): boolean {
     if (rule.os?.name && rule.os.name !== osName()) matches = false;
     if (rule.os?.arch && osArch() !== rule.os.arch) matches = false;
     if (rule.os?.version) {
-      const version = process.platform === 'win32' ? app.getSystemVersion() : process.platform;
+      const version = process.platform === 'win32' ? process.getSystemVersion() : process.platform;
       try { if (!new RegExp(rule.os.version).test(version)) matches = false; } catch { matches = false; }
     }
     if (rule.features && Object.values(rule.features).some(Boolean)) matches = false;
