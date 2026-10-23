@@ -1,0 +1,148 @@
+name: PRIME CLIENT — Build and Release
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Typecheck and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.1'
+      - name: Install pinned dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck application and Electron code
+        run: npm run typecheck
+      - name: Run unit tests
+        run: npm test
+      - name: Build application sources
+        run: npm run build:renderer && npm run build:electron
+
+  build:
+    name: Package (${{ matrix.os }})
+    needs: checks
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            command: dist:win
+          - os: ubuntu-latest
+            command: dist:linux
+          - os: macos-latest
+            command: dist:mac
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.18.1'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Package native desktop artifacts
+        run: npm run ${{ matrix.command }}
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prime-client-${{ matrix.os }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  mod-build:
+    name: Optional mod source build
+    runs-on: ubuntu-latest
+    env:
+      MOD_SOURCE_DIR: ${{ vars.MOD_SOURCE_DIR }}
+      MOD_JAVA_VERSION: ${{ vars.MOD_JAVA_VERSION }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Java
+        if: ${{ env.MOD_SOURCE_DIR != '' && env.MOD_JAVA_VERSION != '' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.MOD_JAVA_VERSION }}
+      - name: Build mod source only when configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${MOD_SOURCE_DIR:-}" ]]; then
+            echo "No MOD_SOURCE_DIR repository variable configured; no mod source was supplied, so no JAR will be produced."
+            echo "Optional mod build skipped — this is not a mod build success." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          case "$MOD_SOURCE_DIR" in /*|*..*) echo "MOD_SOURCE_DIR must be a safe repository-relative path."; exit 1;; esac
+          if [[ -z "${MOD_JAVA_VERSION:-}" ]]; then echo "Set the MOD_JAVA_VERSION repository variable to the Java major version required by this mod." >&2; exit 1; fi
+          test -d "$MOD_SOURCE_DIR" || { echo "Configured MOD_SOURCE_DIR does not exist: $MOD_SOURCE_DIR"; exit 1; }
+          if [[ -f "$MOD_SOURCE_DIR/gradlew" ]]; then
+            chmod +x "$MOD_SOURCE_DIR/gradlew"
+            (cd "$MOD_SOURCE_DIR" && ./gradlew --no-daemon build)
+          elif [[ -f "$MOD_SOURCE_DIR/gradlew.bat" ]]; then
+            echo "This optional source folder contains only a Windows Gradle wrapper; use a platform-specific build workflow for this source." >&2
+            exit 1
+          else
+            echo "No Gradle Wrapper was found at $MOD_SOURCE_DIR; refusing to guess a global Gradle version." >&2
+            exit 1
+          fi
+          mkdir -p mod-artifacts
+          while IFS= read -r jar; do
+            relative="${jar#"$MOD_SOURCE_DIR"/}"
+            safe_name="${relative//\//__}"
+            cp "$jar" "mod-artifacts/$safe_name"
+          done < <(find "$MOD_SOURCE_DIR" -type d \( -name .git -o -name .gradle -o -name node_modules \) -prune -o -path '*/build/libs/*.jar' -type f -size +4c -print)
+          shopt -s nullglob
+          jars=(mod-artifacts/*.jar)
+          if (( ${#jars[@]} == 0 )); then echo "Gradle completed but no non-empty JAR was found under build/libs." >&2; exit 1; fi
+          printf 'Built mod artifacts:\n' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "${jars[@]}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload actual mod JAR
+        if: ${{ env.MOD_SOURCE_DIR != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: prime-client-mod-jar
+          path: mod-artifacts/*.jar
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, mod-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download desktop packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: prime-client-*
+          path: release-assets
+          merge-multiple: true
+      - name: Download optional mod JAR when a real artifact exists
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: prime-client-mod-jar
+          path: release-assets/mod
+      - name: Create release with built files only
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-assets/**
